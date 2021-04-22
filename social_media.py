@@ -9,35 +9,10 @@ from person import Person, Post
 
 
 # Useful to know exactly how it's implemented
-def _gaussian(x, mu=0.5, sigma=0.05):
+def gaussian(x, mu=0.5, sigma=0.05):
     norm = 1 / (sigma * np.sqrt(2 * np.pi))
     expo = - 1 / 2 * ((x - mu) / sigma) ** 2
     return norm * np.exp(expo)
-
-
-# Displays the different ways that networkx can visualize a graph
-def test_nx_draw(graph):
-    print("Standard display")
-    nx.draw(graph)
-    plt.show()
-    print("Draw circular layout")
-    nx.draw_circular(graph)
-    plt.show()
-    print("Kamada-Kawai force-directed layout")
-    nx.draw_kamada_kawai(graph)
-    plt.show()
-    print("Draw with random layout")
-    nx.draw_random(graph)
-    plt.show()
-    print("draw with spectral 2D layout")
-    nx.draw_spectral(graph)
-    plt.show()
-    print("draw with spring layout")
-    nx.draw_spring(graph)
-    plt.show()
-    print("draw with shell layout")
-    nx.draw_shell(graph)
-    plt.show()
 
 
 # Uses fast_gnp_random_graph cuz I'm not expecting very connected graphs
@@ -68,7 +43,7 @@ def _gen_connected_graph(num_nodes, avg_degree):
 
 
 # This function generates a dictionary of random people with specified size
-def _gen_rand_ppl(num_people):
+def gen_rand_ppl(num_people):
     # Dictionary of dictionaries
     ppl_dict = {}
     # Populating the dictionary
@@ -85,21 +60,10 @@ def _gen_rand_ppl(num_people):
     return ppl_dict
 
 
-# This function generates a random graph with each Node associated with a randomly generated instance of Person
-def _gen_people_graph(num_people, avg_connections):
-    # Total number of nodes in the graph, and the lowest possible average for the degrees
-    ppl_dict = _gen_rand_ppl(num_people)
-    # Generating the graph that will be associated with the people
-    G = _gen_connected_graph(num_people, avg_connections)
-    # Associating the graph with the randomly generated people
-    nx.set_node_attributes(G, ppl_dict)
-    return G
-
-
 # This function takes in a dictionary of random people and associates them with a randomly generated graph with a
 # minimum average degree of avg_connections (see _gen_connected_graph())
-def _associated_ppl_with_rand_graph(people_dict, avg_connections):
-    num_nodes = len(dict)
+def associated_ppl_with_rand_graph(people_dict, avg_connections):
+    num_nodes = len(people_dict)
     graph = _gen_connected_graph(num_nodes, avg_connections)
     nx.set_node_attributes(graph, people_dict)
     return graph
@@ -119,23 +83,26 @@ def poll_opinions(G, show_hist=False):
         # We can set the number of bins with the `bins` kwarg
         axs.hist(opinion_poll, bins=20, density=True)
         lin = np.linspace(0, 1, 100)
-        axs.plot(lin, _gaussian(lin))
+        axs.plot(lin, gaussian(lin))
         plt.show()
 
 
-# Here are useful functions that I've found online which might come in handy:
-# set(<list>) turns the list into a set
-# set_A.difference(set_B) returns the difference of the sets A - B
-# from functools import cache OR from functools import lru_cache automates memoization
-# nx.is_connected(G) returns True (False) if G is Connected (Not Connected)
-# nx.connected_components(G) returns generators of sets in G
-# nx.gnp_random_graph(n, p, seed=None, directed=False) returns a randomly generated graph with n nodes. Selects
-# edges with p probability
-# nx.fast_gnp_random_graph(...) does something similar, but it's faster for sparse graphs
+# class Company:
 if __name__ == "__main__":
-    G = _gen_people_graph(100, 3)
-    poll_opinions(G, show_hist=True)
-    # nx.draw_kamada_kawai(G, with_labels=True)
-    # plt.show()
-    # app = Viewer(G)
-    # app.mainloop()
+    num_reruns = 1
+    num_users = 10
+    avg_cxns = 3
+    num_cycles = 1
+
+    # These are the users that we will keep running tests on. We will randomize the graph later
+    users = gen_rand_ppl(num_users)
+    graph = associated_ppl_with_rand_graph(users, 3)
+    # going through multiple time cycles
+    for i in range(num_cycles):
+        # This is the most novel user-generated content
+        new_content = []
+        for node in graph.nodes(data=True):
+            person = node[1]['Person']
+            post = person.make_post()
+            if isinstance(post, Post):
+                new_content.append(post)

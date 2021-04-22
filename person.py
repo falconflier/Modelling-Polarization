@@ -9,8 +9,8 @@ def simple_update(stimulus, prior):
 
 
 class Post:
-    def __init__(self, engagement, leaning):
-        self.engaging = engagement
+    def __init__(self, interest_value, leaning):
+        self.interest_value = interest_value
         self.leaning = leaning
 
 
@@ -26,8 +26,10 @@ class Person:
         self.feed = []
         # This keeps track of direct notifications to the user (from adjacent nodes)
         self.notifications = []
-        # This keeps track of what the person thinks over time. Initialized to be some value
+        # This keeps track of what the person thinks over time. Initialized to be some value that we also keep track
+        # of for later if we want to reset them (new stage of MC)
         self.opinion = initial_opinion
+        self.initialized_opinion = initial_opinion
         # This is the function that they use to determine how to update their beliefs based on new stimuli
         self.belief_update_func = update_func
         # This keeps track of whether they are online or not
@@ -38,22 +40,34 @@ class Person:
         else:
             self.name = names.get_full_name()
 
-    def _make_post(self):
+    # Resets the state of the person to their original opinion, with an empty feed and no notifications
+    def reset(self, is_online=True):
+        self.opinion = self.initialized_opinion
+        self.feed.clear()
+        self.notifications.clear()
+        self.is_online = is_online
+
+    # This is called to determine whether or not the person creates a post. If not, they return None. If they do,
+    # they return the post
+    def make_post(self):
         # TODO: write the method that determines how people create content
-        pass
+        print("Mwahahaha")
+        return None
 
     # Function that has the person read the first few posts in their inbox
     def _read_feed(self):
         num_posts_to_read = self.consumption + np.random.normal()
         if num_posts_to_read < 1:
             num_posts_to_read = 1
-        # This list keeps track of the engagement of the user while reading each article
+        # This list keeps track of the engagement of the user while reading each article (interest + screen)
         engagement = []
-        # This keeps track of how stimulating the session was as a whole
-        interest = 0
         for i in range(num_posts_to_read):
-            pass
-        return interest, engagement
+            post = self.feed.pop(0)
+            # This person finds the article interesting at face value (does not take into account their leaning)
+            #TODO: Update their beliefs, and change their interest based on the bias of the article
+            interest = post.interest_value
+            engagement.append(interest)
+        return engagement
 
     # Function that simulates random phone pickups. if they get an interesting enough notification, they'll go online
     def _check_phone(self):
@@ -91,7 +105,8 @@ class Person:
         tot_interest = []
         if self.is_online:
             # Reads through the stuff that's been recommended by the algorithm
-            tot_interest, engagement = self._read_feed()
+            engagement = self._read_feed()
+            tot_interest = sum(engagement)
             self.is_online = self._stay_online(tot_interest)
         else:
             # They'll check their phones 10% of the cycles for new notifications
