@@ -1,5 +1,4 @@
 import secrets
-
 import numpy as np
 import networkx as nx
 import matplotlib
@@ -9,6 +8,14 @@ from networkx_viewer import Viewer
 from person import Person, Post
 
 
+# Useful to know exactly how it's implemented
+def _gaussian(x, mu=0.5, sigma=0.05):
+    norm = 1 / (sigma * np.sqrt(2 * np.pi))
+    expo = - 1 / 2 * ((x - mu) / sigma) ** 2
+    return norm * np.exp(expo)
+
+
+# A method that I shamelessly copied from stackexchange while I was trying to get interactive graphs to work
 def stack_exchange_interactive_graph():
     import numpy as np
     import matplotlib.pyplot as plt; plt.ion()
@@ -42,6 +49,7 @@ def stack_exchange_interactive_graph():
     node_positions = plot_instance.node_positions
 
 
+# Displays the different ways that networkx can visualize a graph
 def test_nx_draw(graph):
     print("Standard display")
     nx.draw(graph)
@@ -93,24 +101,60 @@ def _gen_connected_graph(num_nodes, avg_degree):
     return G
 
 
-def _gen_people_graph():
-    # Total number of nodes in the graph, and the lowest possible average for the degrees
-    num_people = 20
-    avg_connections = 2
+# This function generates a dictionary of random people with specified size
+def _gen_rand_ppl(num_people):
     # Dictionary of dictionaries
-    dict = {}
+    ppl_dict = {}
     # Populating the dictionary
     for i in range(num_people):
-        rand_person = Person(int(np.random.rand() * 5), np.random.rand(), np.random.rand())
+        init_op = np.random.normal(loc=0.5, scale=0.05)
+        if init_op < 0:
+            init_op = 0
+        elif init_op > 1:
+            init_op = 1
+        rand_person = Person(int(np.random.rand() * 5), np.random.rand(), np.random.rand(), initial_opinion=init_op)
         # Points to a person with certain attributes and names
         rand_person_dict = {"Name": rand_person.my_name_is(), "Person": rand_person}
-        dict[i] = rand_person_dict
+        ppl_dict[i] = rand_person_dict
+    return ppl_dict
+
+
+# This function generates a random graph with each Node associated with a randomly generated instance of Person
+def _gen_people_graph(num_people, avg_connections):
+    # Total number of nodes in the graph, and the lowest possible average for the degrees
+    ppl_dict = _gen_rand_ppl(num_people)
     # Generating the graph that will be associated with the people
     G = _gen_connected_graph(num_people, avg_connections)
-    print(dict)
     # Associating the graph with the randomly generated people
-    nx.set_node_attributes(G, dict)
+    nx.set_node_attributes(G, ppl_dict)
     return G
+
+
+# This function takes in a dictionary of random people and associates them with a randomly generated graph with a
+# minimum average degree of avg_connections (see _gen_connected_graph())
+def _associated_ppl_with_rand_graph(people_dict, avg_connections):
+    num_nodes = len(dict)
+    graph = _gen_connected_graph(num_nodes, avg_connections)
+    nx.set_node_attributes(G, people_dict)
+    return graph
+
+
+# Finds the polarization and average opinion of the population
+def poll_opinions(G, show_hist=False):
+    opinion_poll = []
+    for node in G.nodes(data=True):
+        name = node[1]['Name']
+        person = node[1]['Person']
+        opinion = person.get_opinion()
+        # print(f"Name is {name}, opinion is {opinion}")
+        opinion_poll.append(opinion)
+    if show_hist:
+        fig, axs = plt.subplots(1)
+        # We can set the number of bins with the `bins` kwarg
+        axs.hist(opinion_poll, bins=20, density=True)
+        lin = np.linspace(0, 1, 100)
+        axs.plot(lin, _gaussian(lin))
+        plt.show()
 
 
 # Here are useful functions that I've found online which might come in handy:
@@ -123,8 +167,9 @@ def _gen_people_graph():
 # edges with p probability
 # nx.fast_gnp_random_graph(...) does something similar, but it's faster for sparse graphs
 if __name__ == "__main__":
-    G = _gen_people_graph()
-    nx.draw_kamada_kawai(G, with_labels=True)
-    plt.show()
-    app = Viewer(G)
-    app.mainloop()
+    G = _gen_people_graph(100, 3)
+    poll_opinions(G, show_hist=True)
+    # nx.draw_kamada_kawai(G, with_labels=True)
+    # plt.show()
+    # app = Viewer(G)
+    # app.mainloop()
