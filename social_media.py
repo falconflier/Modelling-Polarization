@@ -16,10 +16,9 @@ def gaussian(x, mu=0.5, sigma=0.05):
 
 
 # Finds the polarization and average opinion of the population
-def poll_opinions(G, show_hist=False):
+def poll_opinions(graph, show_hist=False):
     opinion_poll = []
-    for node in G.nodes(data=True):
-        name = node[1]['Name']
+    for node in graph.nodes(data=True):
         person = node[1]['Person']
         opinion = person.get_opinion()
         # print(f"Name is {name}, opinion is {opinion}")
@@ -31,6 +30,7 @@ def poll_opinions(G, show_hist=False):
         lin = np.linspace(0, 1, 100)
         axs.plot(lin, gaussian(lin))
         plt.show()
+    return opinion_poll
 
 
 # Function that iterates through a list of posts to find the one that is closest to the specified attributes
@@ -143,83 +143,113 @@ def send_news(user, content):
 
 # class Company:
 if __name__ == "__main__":
-    # num_mc_cycles = 1
-    num_users = 10
+    num_mc_cycles = 2
+    num_users = 100
     avg_cxns = 3
     num_time_cycles = 100
+    # Keeps track of how long a period of time is. Might be useful later for normalizing data
+    len_time_interval = 1
 
-    # These are the users that we will keep running tests on. We will randomize the graph later
+    # These are the users that we will keep running tests on. We will keep them through multiple iterations of the
+    # algorithm
     users = gen_rand_ppl(num_users)
-    graph = link_ppl_rand_graph(users, 3)
+    for mc_cycle in range(num_mc_cycles):
+        # Randomizing social connections
+        graph = link_ppl_rand_graph(users, 3)
 
-    # draw_bias_graph(graph)
+        # Resetting users to their original state
+        for person in users.items():
+            # print(person)
+            person[1]['Person'].reset()
 
-    """
-    This is all the content that has been generated in the last couples cycles of the algorithm. I don't think we can
-    store all of the data, because I ran a test and 10,000^2 posts managed to use up all of my memory.
-    If we choose to remove duplicate posts from people's feeds, we can use a decorator on the node, and employ this
-    indexing system so that we don't have to keep track of every single post that they have seen in the past
-    """
-    num_stored_cycles = 7
-    store_idx = -1
-    all_content = [i for i in range(num_stored_cycles)]
+        # draw_bias_graph(graph)
 
-    # going through multiple time cycles
-    for i in range(num_time_cycles):
-        # This is the most novel user-generated content
-        new_content = np.ones([0, 3])
         """
-        This is the first time that we'll iterate through the graph. The first time, we're seeing who posted on their
-        message board. It's kind of inefficient, but I don't see a way around it if we always want to procure the
-        freshest news for the users. This loop iterates through every node in the graph and gives a tuple with info
-        about the node
+        This is all the content that has been generated in the last couples cycles of the algorithm. I don't think we can
+        store all of the data, because I ran a test and 10,000^2 posts managed to use up all of my memory.
+        If we choose to remove duplicate posts from people's feeds, we can use a decorator on the node, and employ this
+        indexing system so that we don't have to keep track of every single post that they have seen in the past
         """
-        for node_tuple in graph.nodes(data=True):
-            # Retrieving the associated person with each node
-            person = node_tuple[1]['Person']
-            name = node_tuple[1]['Name']
+        num_stored_cycles = 7
+        store_idx = -1
+        all_content = [-1 for i in range(num_stored_cycles)]
+        # print(f"all content is\n{all_content}\n(should be empty)'")
 
-            # Seeing if that person decides to make a post at this timestep
-            post = person.make_post()
+        # This will allow us to calculate the site's "revenue" over time
+        time_spent_online = []
+
+        # going through multiple time cycles
+        for i in range(num_time_cycles):
+            # This is the most novel user-generated content
+            new_content = np.ones([0, 3])
             """
-            if post is of the proper type (not None) then this portion of the code will send the post to all of this
-            person's friends
+            This is the first time that we'll iterate through the graph. The first time, we're seeing who posted on their
+            message board. It's kind of inefficient, but I don't see a way around it if we always want to procure the
+            freshest news for the users. This loop iterates through every node in the graph and gives a tuple with info
+            about the node
             """
-            if isinstance(post, Post):
-                # If the user decides not to make a post, they return None which is not appended
-                new_content = add_available_post(new_content, post)
+            for node_tuple in graph.nodes(data=True):
+                # Retrieving the associated person with each node
+                person = node_tuple[1]['Person']
+                name = node_tuple[1]['Name']
+
+                # Seeing if that person decides to make a post at this timestep
+                post = person.make_post()
                 """
-                node_tupe is a tuple that holds the node index, as well as its attributes. Have to index into it to
-                use it for an adjacency call, which returns an iterable of node indices
+                if post is of the proper type (not None) then this portion of the code will send the post to all of this
+                person's friends
                 """
-                for neigh_node in graph.adj[node_tuple[0]]:
+                if isinstance(post, Post):
+                    # If the user decides not to make a post, they return None which is not appended
+                    new_content = add_available_post(new_content, post)
                     """
-                    Notifies all of their friends directly that they made a post
-                    graph.nodes[index] returns the attributes of the node, which is a dictionary which we can index
-                    into using the key ['Person'] to get the Person and call its methods
+                    node_tupe is a tuple that holds the node index, as well as its attributes. Have to index into it to
+                    use it for an adjacency call, which returns an iterable of node indices
                     """
-                    graph.nodes[neigh_node]['Person'].notify(post)
+                    for neigh_node in graph.adj[node_tuple[0]]:
+                        """
+                        Notifies all of their friends directly that they made a post
+                        graph.nodes[index] returns the attributes of the node, which is a dictionary which we can index
+                        into using the key ['Person'] to get the Person and call its methods
+                        """
+                        graph.nodes[neigh_node]['Person'].notify(post)
 
-        # print(f"new content:\n{np.around(new_content, 2)}")
-        store_idx += 1
-        if store_idx >= num_stored_cycles:
-            store_idx = 0
-        all_content[store_idx] = new_content
+            # print(f"new content:\n{np.around(new_content, 2)}")
+            store_idx += 1
+            if store_idx >= num_stored_cycles:
+                store_idx = 0
+            all_content[store_idx] = new_content
 
-        # Trying to get all the news in one place so that our algorithms don't have to sort through everything
-        # aggregated_news = all_content[0]
-        # for stored_news in all_content:
-        #     if isinstance(stored_news, int):
-        #         continue
-        #     print(f"aggregated news is \n{aggregated_news}\nstored news is\n{stored_news}")
-        #     aggregated_news = np.hstack((aggregated_news, stored_news))
+            # Trying to get all the news in one place so that our algorithms don't have to sort through everything
+            # aggregated_news = all_content[0]
+            # for stored_news in all_content:
+            #     if isinstance(stored_news, int):
+            #         continue
+            #     print(f"aggregated news is \n{aggregated_news}\nstored news is\n{stored_news}")
+            #     aggregated_news = np.hstack((aggregated_news, stored_news))
 
-        """
-        The second time that we iterate through the graph. This time, we'll actually be making predictions about
-        what people want to see in their inbox
-        """
-        for node_tuple in graph.nodes(data=True):
-            person = node_tuple[1]['Person']
-            # Adding news to their feed (factoring this out so that it's easier to modify later)
-            send_news(person, all_content)
-            person.cycle()
+            num_online = 0
+
+            """
+            The second time that we iterate through the graph. This time, we'll actually be making predictions about
+            what people want to see in their inbox
+            """
+            for node_tuple in graph.nodes(data=True):
+                person = node_tuple[1]['Person']
+                if person.get_online():
+                    num_online += 1
+                # Adding news to their feed (factoring this out so that it's easier to modify later)
+                send_news(person, all_content)
+                # User goes through their normal routine on the site
+                person.cycle()
+
+            time_spent_online.append(num_online)
+
+        print(f"average time on site was {sum(time_spent_online) / len(time_spent_online)}")
+        lin_space = np.arange(len(time_spent_online))
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        opinion_dist = poll_opinions(graph)
+        ax1.plot(lin_space, time_spent_online)
+        ax2.hist(opinion_dist, density=True, bins=min(int(num_users / 5), 30))
+        # ax2.plot(lin_space, lin_space)
+        plt.show()

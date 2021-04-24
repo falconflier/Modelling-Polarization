@@ -112,6 +112,9 @@ class Person:
         else:
             self.name = names.get_full_name()
 
+        # Keeps track of how many timesteps have passed in the algorithm
+        self.time_step = 0
+
     @staticmethod
     def how_engaging(post, user_leaning):
         """
@@ -140,11 +143,20 @@ class Person:
         self.feed.clear()
         self.notifications.clear()
         self.is_online = is_online
+        self.history.new_epoch()
+        self.time_step = 0
+
+    # Method to see if the person is online or not
+    def get_online(self):
+        return self.is_online
 
     # This is called to determine whether or not the person creates a post. If not, they return None. If they do,
     # they return the post
     def make_post(self):
-        if np.random.rand() < self.activity:
+        # If the person is offline, they will not be making any posts
+        if not self.is_online:
+            return None
+        elif np.random.rand() < self.activity:
             # Screening the leaning of the user
             leaning = self.opinion + np.random.normal(loc=0.0, scale=0.1)
             if leaning > 1:
@@ -240,4 +252,5 @@ class Person:
             # The person has a 5% chance of spontaneously going online
             elif np.random.rand() < 0.05:
                 self.is_online = True
+        self.time_step += 1
         return tot_interest
