@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 import secrets
+import matplotlib.pyplot as plt
 from person import Person, Post
 
 """
@@ -15,7 +16,8 @@ def gen_connected_graph(num_nodes, avg_degree):
     prob = 0
     # Avoiding divide by 0 errors (if num_nodes==1, we want prob==0)
     if num_nodes > 1:
-        # In an (undirected) graph we have n(n-1)/2 total possible edges, so we need a proper probability of drawing an edge
+        # In an (undirected) graph we have n(n-1)/2 total possible edges, so we need a proper probability of drawing an
+        # edge
         prob = 2 * avg_degree * num_nodes / (num_nodes * (num_nodes - 1))
     if prob > 1:
         prob = 1
@@ -51,7 +53,7 @@ def gen_rand_ppl(num_people):
             init_op = 0
         elif init_op > 1:
             init_op = 1
-        rand_person = Person(int(np.random.rand() * 5), np.random.rand(), np.random.rand(), initial_opinion=init_op)
+        rand_person = Person(int(np.random.rand() * 5), np.random.rand() / 2, np.random.rand(), initial_opinion=init_op)
         # The dictionary holds the person's name, and the actualy instance of the person class to call methods on
         rand_person_dict = {"Name": rand_person.my_name_is(), "Person": rand_person}
         ppl_dict[i] = rand_person_dict
@@ -65,3 +67,22 @@ def link_ppl_rand_graph(people_dict, avg_connections):
     graph = gen_connected_graph(num_nodes, avg_connections)
     nx.set_node_attributes(graph, people_dict)
     return graph
+
+
+def draw_bias_graph(graph):
+    """
+    @type graph: the graph to draw, with associated dictionary of People with an opinion field
+    @return:
+    """
+    color_map = []
+    for node_tuple in graph.nodes(data=True):
+        # Retrieving the associated leaning with each node
+        leaning = node_tuple[1]['Person'].get_opinion()
+        if leaning < 0.5:
+            color_map.append('red')
+        elif leaning > 0.5:
+            color_map.append('blue')
+        else:
+            color_map.append('green')
+    nx.draw(graph, node_color=color_map, with_labels=True)
+    plt.show()

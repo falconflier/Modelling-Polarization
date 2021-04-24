@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import netgraph
 from networkx_viewer import Viewer
 from person import Person, Post
-from graph_funcs import gen_rand_ppl, link_ppl_rand_graph
+from graph_funcs import gen_rand_ppl, link_ppl_rand_graph, draw_bias_graph
 
 
 # Useful to know exactly how it's implemented
@@ -73,12 +73,72 @@ def add_available_post(array, post):
     return np.concatenate((array[:idx], [post.get_stripped_data()], array[idx:]))
 
 
-def send_news(user):
+def send_news(user, content):
     """
-    @type user: Person
+    @param content: all the available content that has been generated in the last time step, stored as a list of
+    numpy arrays (there's probably a more efficient way to do that, but I'm not sure how)
+    @type user: Person whose feed we will populate with new posts
     """
+    tolerance = 0.3
     opinion = user.get_opinion()
-    # TODO: based on the user's current opinion, send them news that reinforces their beliefs
+    output = []
+    for array in content:
+        # Skipping over portions of the array which aren't "initialized"
+        if isinstance(array, int):
+            continue
+        """
+        basic idea:
+        We're going to check all posts that are within 0.15 leaning of the user's opinion. Then we're going to use the
+        static method in Person class to calculate how engaging it will be, rank that, and then send it to the user's
+        feed
+        """
+        # print(f"array is \n{array}\nportion that we're interested in is\n{array[:, 0]}")
+        # This is the index that a post with the perfect leaning would have. It's the beginning of our search
+        opinion_idx = np.searchsorted(array[:, 0], opinion)
+        """
+        Checking the posts that have more of a positive leaning
+        """
+        if opinion_idx < len(array):
+            # Initializing the first post that we examine
+            post_leaning = array[opinion_idx, 0]
+            post = Post.from_array(array[opinion_idx])
+            post_idx = opinion_idx
+            # While we're still close to the user's preferred region
+            while np.abs(post_leaning - opinion) < tolerance and post_idx < len(array):
+                # Predicting how riveting the post will be, and storing that
+                predicted_engagement = Person.how_engaging(post, opinion)
+                output.append([predicted_engagement, post])
+                # If we're at the end, we need to break out of the loop
+                if post_idx == len(array) - 1:
+                    break
+                # Otherwise we can go onto the next post
+                post_idx += 1
+                post_leaning = array[post_idx, 0]
+                post = Post.from_array(array[post_idx])
+        """
+        Checking the posts that have more of a negative leaning
+        """
+        if 0 < opinion_idx < len(array):
+            # Initializing the first post that we examine
+            post_idx = opinion_idx - 1
+            post_leaning = array[post_idx, 0]
+            post = Post.from_array(array[post_idx])
+            # While we're still close to the user's preferred region
+            while np.abs(post_leaning - opinion) < tolerance and post_idx >= 0:
+                # Predicting how riveting the post will be, and storing that
+                predicted_engagement = Person.how_engaging(post, opinion)
+                output.append([predicted_engagement, post])
+                # If we've reached the zeroeth index, we need to break out of the loop
+                if post_idx == 0:
+                    break
+                # Otherwise we can go onto the next post
+                post_idx -= 1
+                post_leaning = array[post_idx, 0]
+                post = Post.from_array(array[post_idx])
+    output = sorted(output, key=lambda x: x[0], reverse=True)
+    for tuple in output:
+        person.add_to_feed(tuple[1])
+
 
 
 # class Company:
@@ -91,6 +151,8 @@ if __name__ == "__main__":
     # These are the users that we will keep running tests on. We will randomize the graph later
     users = gen_rand_ppl(num_users)
     graph = link_ppl_rand_graph(users, 3)
+
+    # draw_bias_graph(graph)
 
     """
     This is all the content that has been generated in the last couples cycles of the algorithm. I don't think we can
@@ -138,11 +200,19 @@ if __name__ == "__main__":
                     """
                     graph.nodes[neigh_node]['Person'].notify(post)
 
-        print(f"new content:\n{np.around(new_content, 2)}")
+        # print(f"new content:\n{np.around(new_content, 2)}")
         store_idx += 1
-        if store_idx > 2:
+        if store_idx >= num_stored_cycles:
             store_idx = 0
         all_content[store_idx] = new_content
+
+        # Trying to get all the news in one place so that our algorithms don't have to sort through everything
+        # aggregated_news = all_content[0]
+        # for stored_news in all_content:
+        #     if isinstance(stored_news, int):
+        #         continue
+        #     print(f"aggregated news is \n{aggregated_news}\nstored news is\n{stored_news}")
+        #     aggregated_news = np.hstack((aggregated_news, stored_news))
 
         """
         The second time that we iterate through the graph. This time, we'll actually be making predictions about
@@ -151,5 +221,5 @@ if __name__ == "__main__":
         for node_tuple in graph.nodes(data=True):
             person = node_tuple[1]['Person']
             # Adding news to their feed (factoring this out so that it's easier to modify later)
-            send_news(person)
+            send_news(person, all_content)
             person.cycle()

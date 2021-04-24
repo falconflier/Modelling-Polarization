@@ -18,6 +18,7 @@ def simple_update(stimulus, prior, interest):
     # TODO: figure out how to do Bayesian belief updating
     return prior
 
+
 class Post:
     # Taken from stackoverflow question 1045344
     new_id = itertools.count()
@@ -130,7 +131,7 @@ class Person:
         b = (1 - user_leaning) * temp_num
         # our cutoff for the gamma distribution (to keep it from blowing up to infinity)
         cutoff = 10
-        bias_factor = min(beta_dist(x, a, b) / cutoff + 1) / 2
+        bias_factor = (min(beta_dist(x, a, b), cutoff) / cutoff + 1) / 2
         return post.get_interest() * bias_factor
 
     # Resets the state of the person to their original opinion, with an empty feed and no notifications
@@ -169,11 +170,14 @@ class Person:
 
     # Function that has the person read the first few posts in their inbox
     def _read_feed(self):
-        num_posts_to_read = self.consumption + np.random.normal()
+        num_posts_to_read = int(self.consumption + np.random.normal())
         if num_posts_to_read < 1:
             num_posts_to_read = 1
         # This list keeps track of the engagement of the user while reading each article (interest + screen)
         engagement = []
+        if num_posts_to_read > len(self.feed):
+            print(f"You haven't given {self.name} enough posts to read!!! They're getting bored!")
+            return engagement
         for i in range(num_posts_to_read):
             post = self.feed.pop(0)
             # This person finds the article interesting at face value (does not take into account their leaning)
@@ -185,7 +189,7 @@ class Person:
     # Function that simulates random phone pickups. if they get an interesting enough notification, they'll go online
     def _check_phone(self):
         for post in self.notifications:
-            if post.get_engagement() > self.exp_eng:
+            if post.get_interest() > self.exp_eng:
                 self.is_online = True
                 break
         self.notifications.clear()
@@ -205,6 +209,11 @@ class Person:
         assert isinstance(post, Post)
         # print(f"{self.name} notified of post")
         self.notifications.append(post)
+
+    # Adds a post to their feed
+    def add_to_feed(self, post):
+        assert isinstance(post, Post)
+        self.feed.append(post)
 
     # Returns the person's name
     def my_name_is(self):
