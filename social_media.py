@@ -1,4 +1,3 @@
-import secrets
 import numpy as np
 import networkx as nx
 import matplotlib
@@ -6,6 +5,7 @@ import matplotlib.pyplot as plt
 import netgraph
 from networkx_viewer import Viewer
 from person import Person, Post
+from graph_funcs import gen_rand_ppl, link_ppl_rand_graph
 
 
 # Useful to know exactly how it's implemented
@@ -13,60 +13,6 @@ def gaussian(x, mu=0.5, sigma=0.05):
     norm = 1 / (sigma * np.sqrt(2 * np.pi))
     expo = - 1 / 2 * ((x - mu) / sigma) ** 2
     return norm * np.exp(expo)
-
-
-# Uses fast_gnp_random_graph cuz I'm not expecting very connected graphs
-def _gen_connected_graph(num_nodes, avg_degree):
-    # In an (undirected) graph we have n(n-1)/2 total possible edges, so we need a proper probability of drawing an edge
-    prob = 2 * avg_degree * num_nodes / (num_nodes * (num_nodes - 1))
-    if prob > 1:
-        prob = 1
-    # Generating a random graph with the specified attributes
-    G = nx.fast_gnp_random_graph(num_nodes, prob)
-    # nx.draw_kamada_kawai(G)
-    # plt.show()
-    num_added_edges = 0
-    # Making the graph connected
-    while not nx.is_connected(G):
-        # Gives a generator of sets of all nodes
-        sets_of_cxns = nx.connected_components(G)
-        first_list = list(next(sets_of_cxns))
-        second_list = list(next(sets_of_cxns))
-        first_node = secrets.choice(first_list)
-        second_node = secrets.choice(second_list)
-        G.add_edge(first_node, second_node)
-        num_added_edges += 1
-    print(f"Number of added edges is {num_added_edges}")
-    # nx.draw_kamada_kawai(G)
-    # plt.show()
-    return G
-
-
-# This function generates a dictionary of random people with specified size
-def gen_rand_ppl(num_people):
-    # Dictionary of dictionaries
-    ppl_dict = {}
-    # Populating the dictionary
-    for i in range(num_people):
-        init_op = np.random.normal(loc=0.5, scale=0.05)
-        if init_op < 0:
-            init_op = 0
-        elif init_op > 1:
-            init_op = 1
-        rand_person = Person(int(np.random.rand() * 5), np.random.rand(), np.random.rand(), initial_opinion=init_op)
-        # The dictionary holds the person's name, and the actualy instance of the person class to call methods on
-        rand_person_dict = {"Name": rand_person.my_name_is(), "Person": rand_person}
-        ppl_dict[i] = rand_person_dict
-    return ppl_dict
-
-
-# This function takes in a dictionary of random people and associates them with a randomly generated graph with a
-# minimum average degree of avg_connections (see _gen_connected_graph())
-def associated_ppl_with_rand_graph(people_dict, avg_connections):
-    num_nodes = len(people_dict)
-    graph = _gen_connected_graph(num_nodes, avg_connections)
-    nx.set_node_attributes(graph, people_dict)
-    return graph
 
 
 # Finds the polarization and average opinion of the population
@@ -104,30 +50,62 @@ def find_post_with_attr(list_posts, des_interest, des_leaning):
     return closest_post
 
 
-"""
-Given that even social media companies don't have a direct link into your mind, I'm going to write a function that looks
-at how engaged the use was with different articles in the last step, and tries to predict how they are leaning on the
-issue
-"""
-def predict_leaning():
-    # TODO: make this actually predict something
-    return 0.5
+def add_available_post(array, post):
+    """
+    This function takes in a post, and stores the stripped down data (leaning, interest, and id) in a numpy array. Sorts the
+    posts by their leaning for quick access by the social media site
+    @param array: numpy n by 3 array of doubles
+    @param post: post to be stored in the array
+    @return: array with the post appended
+    """
+    if len(array) == 0:
+        return np.array([post.get_stripped_data()])
+    idx = np.searchsorted(array[:, 0], post.get_leaning())
+    # print(f"array started out as \n{np.around(array, 2)}\n want to add post with {np.round(post.get_leaning(), 2)} leaning"
+    #       f" to index {idx}")
+    if idx == 0:
+        return np.concatenate(([post.get_stripped_data()], array))
+    elif idx == len(array):
+        return np.concatenate((array, [post.get_stripped_data()]))
+
+    # print(f"post is {post}, array is {array} index is {idx}, get_stripped_data returns {post.get_stripped_data()}")
+    # print(f"array[:idx] is {array[:idx]}, and array[idx:] is {array[idx:]}")
+    return np.concatenate((array[:idx], [post.get_stripped_data()], array[idx:]))
+
+
+def send_news(user):
+    """
+    @type user: Person
+    """
+    opinion = user.get_opinion()
+    # TODO: based on the user's current opinion, send them news that reinforces their beliefs
 
 
 # class Company:
 if __name__ == "__main__":
     # num_mc_cycles = 1
-    num_users = 3
+    num_users = 10
     avg_cxns = 3
-    num_time_cycles = 1
+    num_time_cycles = 100
 
     # These are the users that we will keep running tests on. We will randomize the graph later
     users = gen_rand_ppl(num_users)
-    graph = associated_ppl_with_rand_graph(users, 3)
+    graph = link_ppl_rand_graph(users, 3)
+
+    """
+    This is all the content that has been generated in the last couples cycles of the algorithm. I don't think we can
+    store all of the data, because I ran a test and 10,000^2 posts managed to use up all of my memory.
+    If we choose to remove duplicate posts from people's feeds, we can use a decorator on the node, and employ this
+    indexing system so that we don't have to keep track of every single post that they have seen in the past
+    """
+    num_stored_cycles = 7
+    store_idx = -1
+    all_content = [i for i in range(num_stored_cycles)]
+
     # going through multiple time cycles
     for i in range(num_time_cycles):
         # This is the most novel user-generated content
-        new_content = []
+        new_content = np.ones([0, 3])
         """
         This is the first time that we'll iterate through the graph. The first time, we're seeing who posted on their
         message board. It's kind of inefficient, but I don't see a way around it if we always want to procure the
@@ -147,7 +125,7 @@ if __name__ == "__main__":
             """
             if isinstance(post, Post):
                 # If the user decides not to make a post, they return None which is not appended
-                new_content.append(post)
+                new_content = add_available_post(new_content, post)
                 """
                 node_tupe is a tuple that holds the node index, as well as its attributes. Have to index into it to
                 use it for an adjacency call, which returns an iterable of node indices
@@ -159,12 +137,19 @@ if __name__ == "__main__":
                     into using the key ['Person'] to get the Person and call its methods
                     """
                     graph.nodes[neigh_node]['Person'].notify(post)
+
+        print(f"new content:\n{np.around(new_content, 2)}")
+        store_idx += 1
+        if store_idx > 2:
+            store_idx = 0
+        all_content[store_idx] = new_content
+
         """
         The second time that we iterate through the graph. This time, we'll actually be making predictions about
         what people want to see in their inbox
         """
         for node_tuple in graph.nodes(data=True):
             person = node_tuple[1]['Person']
-            # We need to know how engaged they were with the past content
-            past_engagement = node_tuple[1]['Person']
-
+            # Adding news to their feed (factoring this out so that it's easier to modify later)
+            send_news(person)
+            person.cycle()

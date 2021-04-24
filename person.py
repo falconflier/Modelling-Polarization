@@ -1,32 +1,72 @@
 import numpy as np
-from scipy.special import expit
+from scipy.special import expit, gamma
 import names
 import itertools
 from history import History
 
 
-# Rule to update what each person believes after seeing a new news article. This is not super accurate yet
-def simple_update(stimulus, prior):
-    return expit(stimulus + prior)
+# Returns the value of a beta distribution at x with a and b parameters
+def beta_dist(x, a, b):
+    norm = gamma(a + b) / gamma(a) * gamma(b)
+    func = x ** (a - 1) * (1 - x) ** (b - 1)
+    return func * norm
 
+
+# Rule to update what each person believes after seeing a new news article
+def simple_update(stimulus, prior, interest):
+    # return expit(stimulus + prior)
+    # TODO: figure out how to do Bayesian belief updating
+    return prior
 
 class Post:
     # Taken from stackoverflow question 1045344
     new_id = itertools.count()
 
-    def __init__(self, interest_value, leaning, author=None):
-        self.interest_value = interest_value
-        self.leaning = leaning
-        self.id = next(Post.new_id)
+    """
+    Instantiates a post with the given attributes
+    """
+    def __init__(self, leaning, interest_value, id=None, author=None):
+        self.interest_value = leaning
+        self.leaning = interest_value
+        if isinstance(id, int):
+            self.id = id
+        else:
+            self.id = next(Post.new_id)
         if isinstance(author, str):
             self.name = author
         else:
-            self.name = "Author not specified"
+            self.name = "ANON"
 
+    """
+    Instantiates a post from an array holding the leaning, interest value, and ID
+    """
+    @classmethod
+    def from_array(cls, array):
+        assert len(array) == 3
+        return cls(array[0], array[1], id=array[2])
+
+    """
+    When we're looking for a post with certain characteristics, this method is useful for seeing how far "off" from
+    our ideal post we are
+    """
     def l2_diff(self, des_interest, des_leaning):
         inter_err = (self.interest_value - des_interest) ** 2
         lean_err = (self.leaning - des_leaning) ** 2
         return np.sqrt(inter_err + lean_err)
+
+    # returns the unique id of the post
+    def get_id(self):
+        return self.id
+
+    def get_leaning(self):
+        return self.leaning
+
+    def get_interest(self):
+        return self.interest_value
+
+    # This returns the post ID, its interest value, and its leaning as a list. Useful when trying to save memory
+    def get_stripped_data(self):
+        return [self.leaning, self.interest_value, self.id]
 
 
 class Person:
@@ -71,6 +111,28 @@ class Person:
         else:
             self.name = names.get_full_name()
 
+    @staticmethod
+    def how_engaging(post, user_leaning):
+        """
+        @type post: Post
+        @return:
+        """
+        x = post.get_leaning()
+        """
+        This section tries to account for the fact that we like news which aligns most closely with our own views most.
+        More information in the documentation and desmos page
+        """
+        # We have an inflection point at a leaning of 0.9 for this value of the standard deviation
+        std_dev = 0.084
+        # We need to calculate a and b for the beta distribution (uses desmos' example page calculations)
+        temp_num = user_leaning * (1 - user_leaning) / (std_dev ** 2)
+        a = user_leaning * temp_num
+        b = (1 - user_leaning) * temp_num
+        # our cutoff for the gamma distribution (to keep it from blowing up to infinity)
+        cutoff = 10
+        bias_factor = min(beta_dist(x, a, b) / cutoff + 1) / 2
+        return post.get_interest() * bias_factor
+
     # Resets the state of the person to their original opinion, with an empty feed and no notifications
     def reset(self, is_online=True):
         self.opinion = self.initialized_opinion
@@ -81,7 +143,7 @@ class Person:
     # This is called to determine whether or not the person creates a post. If not, they return None. If they do,
     # they return the post
     def make_post(self):
-        if np.random.rand() > self.activity:
+        if np.random.rand() < self.activity:
             # Screening the leaning of the user
             leaning = self.opinion + np.random.normal(loc=0.0, scale=0.1)
             if leaning > 1:
@@ -89,7 +151,7 @@ class Person:
             elif leaning < 0:
                 leaning = 0
             # Initializes a post with a random engagement factor and a bias which reflects the user's current opinion
-            post = Post(np.random.rand(), leaning, author=self.name)
+            post = Post(leaning, np.random.rand())
             return post
         # Otherwise the user has decided not to make a post, and returns None
         return None
@@ -100,7 +162,9 @@ class Person:
         # these values
         engagement = []
         for post in self.notifications:
-            engagement.append(post.interest_value)
+            interest = Person.how_engaging(post, self.opinion)
+            engagement.append(interest)
+            self.opinion = self.belief_update_func(post.get_leaning(), self.opinion, interest)
         return engagement
 
     # Function that has the person read the first few posts in their inbox
@@ -113,9 +177,9 @@ class Person:
         for i in range(num_posts_to_read):
             post = self.feed.pop(0)
             # This person finds the article interesting at face value (does not take into account their leaning)
-            # TODO: Update their beliefs, and change their interest based on the bias of the article
-            interest = post.interest_value
+            interest = Person.how_engaging(post, self.opinion)
             engagement.append(interest)
+            self.opinion = self.belief_update_func(post.get_leaning(), self.opinion, interest)
         return engagement
 
     # Function that simulates random phone pickups. if they get an interesting enough notification, they'll go online
@@ -139,7 +203,7 @@ class Person:
         @type post: Post
         """
         assert isinstance(post, Post)
-        print(f"{self.name} notified of post")
+        # print(f"{self.name} notified of post")
         self.notifications.append(post)
 
     # Returns the person's name

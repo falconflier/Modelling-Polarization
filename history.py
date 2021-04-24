@@ -1,3 +1,4 @@
+import numpy as np
 # This class keeps track of the statistics of a person throughout the entire time that the algorithm is run, through
 # different stages of the Monte Carlo process
 
@@ -47,7 +48,42 @@ class History:
 # This class is useful to demarcate the different stages of the MC algorithm, since we are likely to reset people
 class Epoch:
     def __init__(self):
-        self.article_list = []
+        """
+        Initializes the Epoch. Doesn't take in any arguments (yet)
+        """
+        """
+        This be a list of posts, which will let us see exactly what the person was exposed
+        to without having to go through an outside list
+        """
+        self.read_posts = []
+        """
+        This will be a numpy array of values that 
+        """
+        self.read_posts_indices = np.ones(0)
+        self.all_posts = []
 
-    def store_posts(self, posts):
-        self.article_list.append(posts)
+    """
+    Taken from stackexchange question 48776902. Goes through a sorted list, finds the index that the value would have
+    been at (value should not already been in sorted_list) and adds value at that index. Used to speed up the bookeeping
+    of what posts the user has already seen.
+    """
+    def _add_read_posts(self, posts):
+        """
+        @param posts: The list of indices (integers) to be added to self.read_posts_indices
+        @return: Nothing. Sorts and inserts all integers in values self.read_posts
+        """
+        for post in posts:
+            val = post.get_id()
+            # Find the index that val should be at
+            idx = np.searchsorted(self.read_posts_indices, val)
+            # "insert" value at that index
+            self.read_posts_indices = np.concatenate((self.read_posts_indices[:idx], [val], self.read_posts_indices[idx:]))
+
+    # Stores a list of all the posts the user actually finished reading
+    def store_read_posts(self, posts):
+        self.read_posts.append(posts)
+        self._add_read_posts(posts)
+
+    # Stores a list of all the posts which were in the user's feed, but which they may or may not have finished reading
+    def store_all_posts(self):
+        pass
