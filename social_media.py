@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import netgraph
 from networkx_viewer import Viewer
 from person import Person, Post
-from graph_funcs import gen_rand_ppl, link_ppl_rand_graph, draw_bias_graph
+from graph_funcs import gen_rand_ppl, gen_polar_rand_ppl, link_ppl_rand_graph, draw_bias_graph
 
 
 # Useful to know exactly how it's implemented
@@ -16,13 +16,20 @@ def gaussian(x, mu=0.5, sigma=0.05):
 
 
 # Finds the polarization and average opinion of the population
-def poll_opinions(graph, show_hist=False):
+def poll_opinions(ppl_dict, show_hist=False):
+    """
+    @type ppl_dict: dict
+    @type show_hist: bool
+    """
     opinion_poll = []
-    for node in graph.nodes(data=True):
-        person = node[1]['Person']
-        opinion = person.get_opinion()
-        # print(f"Name is {name}, opinion is {opinion}")
-        opinion_poll.append(opinion)
+
+    # for node in ppl_dict.nodes(data=True):
+    #     person = node[1]['Person']
+    #     opinion = person.get_opinion()
+    #     # print(f"Name is {name}, opinion is {opinion}")
+    #     opinion_poll.append(opinion)
+    for element in ppl_dict.items():
+        opinion_poll.append(element[1]['Person'].get_opinion())
     if show_hist:
         fig, axs = plt.subplots(1)
         # We can set the number of bins with the `bins` kwarg
@@ -73,7 +80,7 @@ def add_available_post(array, post):
     return np.concatenate((array[:idx], [post.get_stripped_data()], array[idx:]))
 
 
-def send_news(user, content):
+def send_similar_news(user, content):
     """
     @param content: all the available content that has been generated in the last time step, stored as a list of
     numpy arrays (there's probably a more efficient way to do that, but I'm not sure how)
@@ -140,10 +147,41 @@ def send_news(user, content):
         person.add_to_feed(tuple[1])
 
 
+def send_news(user, content):
+    """
+    @param content: all the available content that has been generated in the last time step, stored as a list of
+    numpy arrays (there's probably a more efficient way to do that, but I'm not sure how)
+    @type user: Person whose feed we will populate with new posts
+    """
+    tolerance = 0.3
+    opinion = user.get_opinion()
+    output = []
+    for array in content:
+        # Skipping over portions of the array which aren't "initialized"
+        if isinstance(array, int):
+            continue
+        """
+        basic idea:
+        We're going to check ALL posts, using
+        static method in Person class to calculate how engaging it will be, rank that, and then send it to the user's
+        feed
+        """
+        for post_array in array:
+            # Recreating the post from information stored about it
+            re_post = Post.from_array(post_array)
+            # Predicting how riveting the post will be, and storing that
+            predicted_engagement = Person.how_engaging(re_post, opinion)
+            output.append([predicted_engagement, re_post])
+    # Sorting the output by how engaging it is
+    output = sorted(output, key=lambda x: x[0], reverse=True)
+    # Putting each post, based on its predicted engagement, in the user's feed
+    for element in output:
+        person.add_to_feed(element[1])
+
 
 # class Company:
 if __name__ == "__main__":
-    num_mc_cycles = 2
+    num_mc_cycles = 1
     num_users = 100
     avg_cxns = 3
     num_time_cycles = 100
@@ -152,7 +190,8 @@ if __name__ == "__main__":
 
     # These are the users that we will keep running tests on. We will keep them through multiple iterations of the
     # algorithm
-    users = gen_rand_ppl(num_users)
+    users = gen_polar_rand_ppl(num_users)
+    initial_op = poll_opinions(users)
     for mc_cycle in range(num_mc_cycles):
         # Randomizing social connections
         graph = link_ppl_rand_graph(users, 3)
@@ -177,9 +216,18 @@ if __name__ == "__main__":
 
         # This will allow us to calculate the site's "revenue" over time
         time_spent_online = []
-
+        # Keeps track of specific timestamps
+        quarter_time = 0
+        half_time = 0
         # going through multiple time cycles
         for i in range(num_time_cycles):
+            # Useful to have this printout
+            if i == num_time_cycles // 4:
+                print("25% complete")
+            elif i == num_time_cycles // 2:
+                print("50% complete")
+            elif i == 3 * num_time_cycles // 4:
+                print("75% complete")
             # This is the most novel user-generated content
             new_content = np.ones([0, 3])
             """
@@ -245,11 +293,13 @@ if __name__ == "__main__":
 
             time_spent_online.append(num_online)
 
-        print(f"average time on site was {sum(time_spent_online) / len(time_spent_online)}")
+        print(f"average users on site was {sum(time_spent_online) / len(time_spent_online)}")
         lin_space = np.arange(len(time_spent_online))
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        opinion_dist = poll_opinions(graph)
-        ax1.plot(lin_space, time_spent_online)
-        ax2.hist(opinion_dist, density=True, bins=min(int(num_users / 5), 30))
-        # ax2.plot(lin_space, lin_space)
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+        opinion_dist = poll_opinions(users)
+        # Plots the last 1000 steps of the number of people online
+        ax1.plot(lin_space, time_spent_online[-1000:])
+        n_bins=min(int(num_users / 5), 30)
+        ax2.hist(opinion_dist, density=True, bins=n_bins)
+        ax3.hist(initial_op, density=True, bins=n_bins)
         plt.show()

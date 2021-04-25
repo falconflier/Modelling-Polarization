@@ -42,6 +42,29 @@ def gen_connected_graph(num_nodes, avg_degree):
     return G
 
 
+# Pretty much exactly like gen_rand_ppl but generates two "humps" on the opinion spectrum
+def gen_polar_rand_ppl(num_people):
+    # Dictionary of dictionaries
+    ppl_dict = {}
+    # Populating the dictionary
+    for i in range(num_people):
+        # half of the time, we want people leaning high and the other half we want people leaning low
+        if np.random.rand() > 0.5:
+            init_op = np.random.normal(loc=0.65, scale=0.03)
+        else:
+            init_op = np.random.normal(loc=0.35, scale=0.03)
+        # Making sure that no one's outside our defined range
+        if init_op < 0:
+            init_op = 0
+        elif init_op > 1:
+            init_op = 1
+        rand_person = Person(int(np.random.rand() * 5), np.random.rand() / 2, np.random.rand(), initial_opinion=init_op)
+        # The dictionary holds the person's name, and the actualy instance of the person class to call methods on
+        rand_person_dict = {"Name": rand_person.my_name_is(), "Person": rand_person}
+        ppl_dict[i] = rand_person_dict
+    return ppl_dict
+
+
 # This function generates a dictionary of random people with specified size
 def gen_rand_ppl(num_people):
     # Dictionary of dictionaries

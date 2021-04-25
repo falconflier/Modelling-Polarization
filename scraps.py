@@ -1,5 +1,6 @@
 from person import Person, Post
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 # A method that I stole straight from Matplotlib's documentation. Would be extremely cool to use to model changing
@@ -36,10 +37,10 @@ def animated_hist():
 
     ani = animation.FuncAnimation(fig, prepare_animation(bar_container), 50,
                                   repeat=False, blit=True)
+
+    ani.save('./animation.gif', writer='imagemagick', fps=60)
+
     plt.show()
-
-
-animated_hist()
 
 
 # A method that I shamelessly copied from stackexchange while I was trying to get interactive graphs to work
@@ -75,6 +76,12 @@ def stack_exchange_interactive_graph():
     # To access the new node positions:
     node_positions = plot_instance.node_positions
 
+
+data = []
+for i in range(10000):
+    data.append(np.random.normal(loc=0.0, scale=0.05))
+plt.hist(data, bins=50)
+plt.show()
 
 # my_array = np.zeros([10, 2])
 # for i in range(10):
