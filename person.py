@@ -251,6 +251,7 @@ class Person:
         self.is_online = is_online
         self.history.new_epoch()
         self.time_step = 0
+        self.op_update_posts = [[i, 1, self.opinion] for i in range(5)]
 
     # Method to see if the person is online or not
     def get_online(self):
@@ -315,9 +316,9 @@ class Person:
     # This is the function that will determine whether or not the person decides to keep looking through their feed
     def _stay_online(self, tot_interest):
         prob = np.pi / 2 * np.arctan(tot_interest - self.consumption * self.exp_eng + np.tan(np.pi / 4))
-        # There's always a 5% chance that people stay online, even if they aren't interested
+        # There's always a 5% chance that people stay online, even if they haven't gotten very interesting posts
         prob = max(prob, 0.05)
-        return np.random.rand() >= prob
+        return np.random.rand() <= prob
 
     # Sends a notification to the person's phone
     def notify(self, post):

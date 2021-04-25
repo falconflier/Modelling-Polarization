@@ -1,6 +1,7 @@
 from person import Person, Post
 import numpy as np
 import matplotlib.pyplot as plt
+import networkx as nx
 
 
 # A method that I stole straight from Matplotlib's documentation. Would be extremely cool to use to model changing
@@ -77,12 +78,33 @@ def stack_exchange_interactive_graph():
     node_positions = plot_instance.node_positions
 
 
+def draw_bias_graph(graph):
+    """
+    @type graph: the graph to draw, with associated dictionary of People with an opinion field
+    @return:
+    """
+    color_map = []
+    for node_tuple in graph.nodes(data=True):
+        # Retrieving the associated leaning with each node
+        leaning = node_tuple[1]['Person'].get_opinion()
+        if leaning < 0.5:
+            color_map.append('red')
+        elif leaning > 0.5:
+            color_map.append('blue')
+        else:
+            color_map.append('green')
+    nx.draw(graph, node_color=color_map, with_labels=True)
+    plt.show()
+
+
+
+
+
 data = []
 for i in range(10000):
-    data.append(np.random.normal(loc=0.0, scale=0.05))
-plt.hist(data, bins=50)
+    data.append(np.random.normal(loc=0.5, scale=0.05))
+plt.hist(data, bins=50, range=[0, 1])
 plt.show()
-
 # my_array = np.zeros([10, 2])
 # for i in range(10):
 #     rand_row = np.array([i, np.random.rand()])

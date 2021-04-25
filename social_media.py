@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import networkx as nx
 import matplotlib
@@ -5,7 +6,7 @@ import matplotlib.pyplot as plt
 import netgraph
 from networkx_viewer import Viewer
 from person import Person, Post
-from graph_funcs import gen_rand_ppl, gen_polar_rand_ppl, link_ppl_rand_graph, draw_bias_graph
+from graph_funcs import gen_rand_ppl, gen_polar_rand_ppl, gen_biased_rand_ppl, link_ppl_rand_graph, draw_bias_graph
 
 
 # Useful to know exactly how it's implemented
@@ -182,15 +183,23 @@ def send_news(user, content):
 # class Company:
 if __name__ == "__main__":
     num_mc_cycles = 1
-    num_users = 100
+    """
+    runtimes for 100 users:
+    at 100 time cycles, takes about 7 seconds
+    at 1200 num_time_cycles, takes about 2 minutes to run algorithm
+    can go up to 10000 (and maybe higher?), but takes a bit
+    """
     avg_cxns = 3
+    num_users = 100
     num_time_cycles = 100
     # Keeps track of how long a period of time is. Might be useful later for normalizing data
     len_time_interval = 1
 
     # These are the users that we will keep running tests on. We will keep them through multiple iterations of the
     # algorithm
-    users = gen_polar_rand_ppl(num_users)
+    # users = gen_polar_rand_ppl(num_users, 0.35, 0.65)
+    # users = gen_rand_ppl(num_users)
+    users = gen_biased_rand_ppl(num_users, 0.9)
     initial_op = poll_opinions(users)
     for mc_cycle in range(num_mc_cycles):
         # Randomizing social connections
@@ -209,7 +218,7 @@ if __name__ == "__main__":
         If we choose to remove duplicate posts from people's feeds, we can use a decorator on the node, and employ this
         indexing system so that we don't have to keep track of every single post that they have seen in the past
         """
-        num_stored_cycles = 7
+        num_stored_cycles = 3
         store_idx = -1
         all_content = [-1 for i in range(num_stored_cycles)]
         # print(f"all content is\n{all_content}\n(should be empty)'")
@@ -217,17 +226,28 @@ if __name__ == "__main__":
         # This will allow us to calculate the site's "revenue" over time
         time_spent_online = []
         # Keeps track of specific timestamps
+        start_time = time.time()
         quarter_time = 0
         half_time = 0
+        three_quarters_time = 0
         # going through multiple time cycles
         for i in range(num_time_cycles):
             # Useful to have this printout
             if i == num_time_cycles // 4:
-                print("25% complete")
+                quarter_time = time.time()
+                print(f"25% complete, took {quarter_time - start_time}s")
+                print(f"all content has length {len(all_content)}, sub-news have lengths {[len(all_content[i]) for i in range(num_stored_cycles)]}")
             elif i == num_time_cycles // 2:
-                print("50% complete")
+                half_time = time.time()
+                print(f"50% complete, took {half_time - quarter_time}")
+                print(f"all content has length {len(all_content)}, sub-news have lengths {[len(all_content[i]) for i in range(num_stored_cycles)]}")
             elif i == 3 * num_time_cycles // 4:
-                print("75% complete")
+                three_quarters_time = time.time()
+                print(f"75% complete, took {three_quarters_time - half_time}")
+                print(f"all content has length {len(all_content)}, sub-news have lengths {[len(all_content[i]) for i in range(num_stored_cycles)]}")
+            elif i == 19 * num_time_cycles // 20:
+                print(f"95% complete, took {time.time() - three_quarters_time}")
+                print(f"all content has length {len(all_content)}, sub-news have lengths {[len(all_content[i]) for i in range(num_stored_cycles)]}")
             # This is the most novel user-generated content
             new_content = np.ones([0, 3])
             """
@@ -268,14 +288,6 @@ if __name__ == "__main__":
                 store_idx = 0
             all_content[store_idx] = new_content
 
-            # Trying to get all the news in one place so that our algorithms don't have to sort through everything
-            # aggregated_news = all_content[0]
-            # for stored_news in all_content:
-            #     if isinstance(stored_news, int):
-            #         continue
-            #     print(f"aggregated news is \n{aggregated_news}\nstored news is\n{stored_news}")
-            #     aggregated_news = np.hstack((aggregated_news, stored_news))
-
             num_online = 0
 
             """
@@ -294,12 +306,23 @@ if __name__ == "__main__":
             time_spent_online.append(num_online)
 
         print(f"average users on site was {sum(time_spent_online) / len(time_spent_online)}")
-        lin_space = np.arange(len(time_spent_online))
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
         opinion_dist = poll_opinions(users)
-        # Plots the last 1000 steps of the number of people online
-        ax1.plot(lin_space, time_spent_online[-1000:])
-        n_bins=min(int(num_users / 5), 30)
-        ax2.hist(opinion_dist, density=True, bins=n_bins)
-        ax3.hist(initial_op, density=True, bins=n_bins)
+        np_new_opinions = np.array(opinion_dist)
+        np_old_opinions = np.array(initial_op)
+        print(f"For the original distribution, the the average opinion was {np.round(np.mean(np_old_opinions), 4)} with"
+              f" standard deviation {np.round(np.std(np_old_opinions), 4)}.\nFor the distribution at the end of the "
+              f"algorithm, the average is {np.round(np.mean(np_new_opinions), 4)} and the standard deviation is "
+              f"{np.round(np.std(np_new_opinions), 4)}")
+        # Plots the last few hundred steps of the number of people online
+        num_steps_to_plot = 300
+        if len(time_spent_online) < num_steps_to_plot:
+            lin_space = np.arange(len(time_spent_online))
+            ax1.plot(lin_space, time_spent_online)
+        else:
+            lin_space = np.arange(num_steps_to_plot)
+            ax1.plot(lin_space, time_spent_online[-num_steps_to_plot:])
+        n_bins = min(int(num_users / 5), 30)
+        ax2.hist(opinion_dist, density=True, bins=n_bins, range=[0, 1])
+        ax3.hist(initial_op, density=True, bins=n_bins, range=[0, 1])
         plt.show()
