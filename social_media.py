@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     # These are the users that we will keep running tests on. We will keep them through multiple iterations of the
     # algorithm
-    # users = gen_polar_rand_ppl(num_users, 0.35, 0.65)
+    # users = gen_polar_rand_ppl(num_users, 0.25, 0.75)
     # users = gen_rand_ppl(num_users)
     users = gen_biased_rand_ppl(num_users, 0.9)
     initial_op = poll_opinions(users)
@@ -326,3 +326,10 @@ if __name__ == "__main__":
         ax2.hist(opinion_dist, density=True, bins=n_bins, range=[0, 1])
         ax3.hist(initial_op, density=True, bins=n_bins, range=[0, 1])
         plt.show()
+
+        print("Current bias graph")
+        draw_bias_graph(graph)
+        for node_tuple in graph.nodes(data=True):
+            person = node_tuple[1]['Person'].reset()
+        print("bias graph at beginning of cycle")
+        draw_bias_graph(graph)

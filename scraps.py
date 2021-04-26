@@ -97,13 +97,14 @@ def draw_bias_graph(graph):
     plt.show()
 
 
-
-
-
 data = []
-for i in range(10000):
-    data.append(np.random.normal(loc=0.5, scale=0.05))
-plt.hist(data, bins=50, range=[0, 1])
+for i in range(1000000):
+    # data.append(np.random.normal(loc=0.5, scale=0.05))
+    data.append(np.cbrt(0.5 ** 2 * (np.random.rand() - 0.5)) + 0.5)
+plt.hist(data, bins=50, range=[0, 1], density=True)
+
+linear = np.linspace(0, 1)
+plt.plot(linear, np.ones(len(linear)))
 plt.show()
 # my_array = np.zeros([10, 2])
 # for i in range(10):

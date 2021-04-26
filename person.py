@@ -206,7 +206,7 @@ class Person:
         More information in the documentation and desmos page
         """
         # We have an inflection point at a leaning of 0.9 for this value of the standard deviation
-        std_dev = 0.084
+        std_dev = 0.09
         # We need to calculate a and b for the beta distribution (uses desmos' example page calculations)
         temp_num = mean * (1 - mean) / (std_dev ** 2)
         a = mean * temp_num
@@ -356,8 +356,9 @@ class Person:
             if len(self.notifications) > 0 and np.random.rand() < 0.1:
                 # They'll see if they have any new notifications, and go online if they're interesting
                 self._check_phone()
-            # The person has a 5% chance of spontaneously going online
-            elif np.random.rand() < 0.05:
+            # The person has a 5% chance of spontaneously going online TESTING 0% CASE
+            # elif np.random.rand() < 0.05:
+            elif np.random.rand() < 0:
                 self.is_online = True
         self.time_step += 1
         # Have the user forget some posts
